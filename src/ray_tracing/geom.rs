@@ -1,5 +1,15 @@
+use crate::HitRecord;
+use crate::Hittable;
 use crate::Ray;
 use std::ops::*;
+
+pub const PI: f64 = 3.1415926535897932385;
+
+pub const INFINITY: f64 = f64::INFINITY;
+
+pub fn degrees_to_radians(degrees: f64) -> f64 {
+    degrees * PI / 180.0
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Vec3 {
@@ -11,6 +21,11 @@ impl Vec3 {
     pub const fn new(x: f64, y: f64, z: f64) -> Vec3 {
         Vec3 { x, y, z }
     }
+
+    pub fn iso(v: f64) -> Vec3 {
+        Vec3 { x: v, y: v, z: v }
+    }
+
     pub fn as_slice(&self) -> [f64; 3] {
         [self.x, self.y, self.z]
     }
@@ -145,8 +160,33 @@ impl Neg for &Vec3 {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Point(pub Vec3);
 
-
-pub struct Sphere{
+pub struct Sphere {
     pub center: Point,
-    pub radius: f64
+    pub radius: f64,
+}
+
+impl Hittable for Sphere {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let oc = &ray.origin.0 - &self.center.0;
+        let a = ray.direction.0.length_squared();
+        let half_b = &oc.dot(&ray.direction.0);
+        let c = &oc.length_squared() - self.radius.powf(2.0);
+        let discriminant = half_b * half_b - a * c;
+        if discriminant < 0.0 {
+            return None;
+        } else {
+            let discr_sqrt = discriminant.sqrt();
+            let mut root = (-half_b - discr_sqrt) / a;
+            if root < t_min || root > t_max {
+                root = (-half_b + discr_sqrt) / a;
+                if root < t_min || root > t_max {
+                    return None;
+                }
+            }
+            let t = root;
+            let p = ray.at(t);
+            let normal = Point((&p.0 - &self.center.0).scalar_div(self.radius));
+            Some(HitRecord::new(p, t, normal, &ray))
+        }
+    }
 }

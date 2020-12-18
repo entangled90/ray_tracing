@@ -1,8 +1,6 @@
-use std::io::{stderr, stdout, Stdout, Write};
+use std::io::Write;
 
 use super::geom::*;
-use std::error::Error;
-use std::result::Result;
 
 pub struct Color {
     pub rgb: Vec3,
@@ -13,16 +11,13 @@ impl Color {
     where
         W: Write,
     {
-        w.write(
-            format!(
-                "{} {} {}\n",
-                (255.999 * self.rgb.x) as u32,
-                (255.999 * self.rgb.y) as u32,
-                (255.999 * self.rgb.z) as u32
-            )
-            .as_bytes(),
-        )
-        .map(|_| ())
+        w.write_fmt(format_args!(
+            "{} {} {}\n",
+            (255.999 * self.rgb.x) as u32,
+            (255.999 * self.rgb.y) as u32,
+            (255.999 * self.rgb.z) as u32
+        ))?;
+        Ok(())
     }
 }
 
@@ -41,25 +36,84 @@ impl Ray {
         return Point(&self.origin.0 + &self.direction.0.scalar_mul(t));
     }
 
-    pub fn color(&self) -> Color {
-        let sphere = Sphere{center: Point(Vec3::new(0.0,0.0, -1.0)), radius: 0.5};
-        if self.hits(&sphere) {
-            return Color{rgb: Vec3::new(1.0, 0.0, 0.0)};
-        }
-        let unit = self.direction.0.unit_norm();
-        let t = 0.5 * (unit.y + 1.0);
-        Color {
-            rgb: Vec3::new(1.0, 1.0, 1.0).scalar_mul(1.0 - t)
-                + Vec3::new(0.5, 0.7, 1.0).scalar_mul(t),
+    pub fn color(&self, world: &HittableList) -> Color {
+        if let Some(rec) = world.hit(&self, 0.0, INFINITY) {
+            Color {
+                rgb: (rec.normal.0 + (Vec3::iso(1.0))).scalar_mul(0.5),
+            }
+        } else {
+            let t = 0.5 * (self.direction.0.unit_norm().y + 1.0);
+            Color {
+                rgb: Ray::VEC_ISO_1.scalar_mul(1.0 - t) + Ray::VEC_COLOR.scalar_mul(t),
+            }
         }
     }
 
-    pub fn hits(&self, sphere: &Sphere) -> bool {
-        let oc = &self.origin.0 - &sphere.center.0;
-        let a = self.direction.0.length_squared();
-        let b = 2.0 * &oc.dot(&self.direction.0);
-        let c = &oc.length_squared() - sphere.radius * sphere.radius;
-        let discriminant = b * b - 4.0 * a * c;
-        discriminant > 0.0
+    const VEC_COLOR: Vec3 = Vec3::new(0.5, 0.7, 1.0);
+    const VEC_ISO_1: Vec3 = Vec3::new(1.0, 1.0, 1.0);
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct HitRecord {
+    pub p: Point,
+    pub normal: Point,
+    pub t: f64,
+    // pub front_face: bool,
+}
+
+impl HitRecord {
+    pub fn new(p: Point, t: f64, outward_normal: Point, ray: &Ray) -> HitRecord {
+        let front_face = HitRecord::is_front_face(&outward_normal, ray);
+        let normal = if front_face {
+            outward_normal.clone()
+        } else {
+            Point(-&outward_normal.0)
+        };
+        HitRecord {
+            p,
+            normal,
+            t,
+            // front_face
+        }
+    }
+
+    // static
+    fn is_front_face(outward_normal: &Point, ray: &Ray) -> bool {
+        ray.direction.0.dot(&outward_normal.0) < 0.0
+    }
+}
+
+pub trait Hittable {
+    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
+}
+
+pub struct HittableList {
+    pub hittables: Vec<Box<dyn Hittable>>,
+}
+
+impl HittableList {
+    pub fn new() -> HittableList {
+        HittableList {
+            hittables: Vec::with_capacity(64),
+        }
+    }
+    pub fn add(&mut self, hittable: Box<dyn Hittable>) {
+        self.hittables.push(hittable);
+    }
+
+    pub fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let mut temp_rec: Option<HitRecord> = None;
+        let mut closest_so_far = t_max;
+        for object in &self.hittables {
+            // note closest_so_far is used as t_max
+            match object.hit(ray, t_min, closest_so_far) {
+                Some(rec) => {
+                    closest_so_far = rec.t;
+                    temp_rec = Some(rec);
+                }
+                None => (),
+            }
+        }
+        temp_rec
     }
 }
