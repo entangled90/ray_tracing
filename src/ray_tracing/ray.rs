@@ -1,12 +1,17 @@
 use std::io::Write;
+use std::rc::Rc;
 
 use super::geom::*;
+use super::rand::*;
 
 pub struct Color {
     pub rgb: Vec3,
 }
 
 impl Color {
+    pub fn new_rgb(r: f64, g: f64, b: f64) -> Color {
+        Color::new(Vec3::new(r, g, b))
+    }
     pub fn new(vec: Vec3) -> Color {
         Color { rgb: vec }
     }
@@ -18,14 +23,20 @@ impl Color {
         W: Write,
     {
         let scale = 1.0 / samples_per_pixel as f64;
-
+        let r = (scale * self.rgb.x).sqrt();
+        let g = (scale * self.rgb.y).sqrt();
+        let b = (scale * self.rgb.z).sqrt();
         w.write_fmt(format_args!(
             "{} {} {}\n",
-           (256.0 * Color::clamp_color(self.rgb.x * scale)) as u32,
-           (256.0 * Color::clamp_color(self.rgb.y * scale)) as u32,
-           (256.0 * Color::clamp_color(self.rgb.z * scale)) as u32
+            Color::scale_color_component(r),
+            Color::scale_color_component(g),
+            Color::scale_color_component(b)
         ))?;
         Ok(())
+    }
+
+    fn scale_color_component(c: f64) -> u8 {
+        (256.0 * Color::clamp_color(c)) as u8
     }
 
     fn clamp_color(x: f64) -> f64 {
@@ -44,13 +55,13 @@ impl Color {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub struct Ray {
-    pub origin: &'static Point,
+pub struct Ray<'a> {
+    pub origin: &'a Point,
     pub direction: Point,
 }
 
-impl Ray {
-    pub fn new(origin: &'static Point, direction: Point) -> Ray {
+impl<'a> Ray<'a> {
+    pub fn new(origin: &'a Point, direction: Point) -> Ray {
         Ray { origin, direction }
     }
 
@@ -58,15 +69,25 @@ impl Ray {
         return Point(&self.origin.0 + &self.direction.0.scalar_mul(t));
     }
 
-    pub fn color(&self, world: &HittableList) -> Color {
-        if let Some(rec) = world.hit(&self, 0.0, INFINITY) {
-            Color {
-                rgb: (rec.normal.0 + (Vec3::iso(1.0))).scalar_mul(0.5),
-            }
+    pub fn color(&self, world: &HittableList, depth: u32, r: &mut Random) -> Color {
+        if depth <= 0 {
+            Color::zero()
         } else {
-            let t = 0.5 * (self.direction.0.unit_norm().y + 1.0);
-            Color {
-                rgb: Ray::VEC_ISO_1.scalar_mul(1.0 - t) + Ray::VEC_COLOR.scalar_mul(t),
+            if let Some(rec) = world.hit(&self, 0.001, INFINITY) {
+                match rec.material.scatter(self, &rec, r) {
+                    Some((color, ray_out)) => Color::new(
+                        ray_out
+                            .color(world, depth - 1, r)
+                            .rgb
+                            .index_wise_mul(&color.rgb),
+                    ),
+                    None => Color::zero(),
+                }
+            } else {
+                let t = 0.5 * (self.direction.0.unit_norm().y + 1.0);
+                Color {
+                    rgb: Ray::VEC_ISO_1.scalar_mul(1.0 - t) + Ray::VEC_COLOR.scalar_mul(t),
+                }
             }
         }
     }
@@ -75,16 +96,22 @@ impl Ray {
     const VEC_ISO_1: Vec3 = Vec3::new(1.0, 1.0, 1.0);
 }
 
-#[derive(Debug, Clone, PartialEq)]
 pub struct HitRecord {
     pub p: Point,
     pub normal: Point,
+    pub material: Rc<Box<dyn Material>>,
     pub t: f64,
     // pub front_face: bool,
 }
 
 impl HitRecord {
-    pub fn new(p: Point, t: f64, outward_normal: Point, ray: &Ray) -> HitRecord {
+    pub fn new(
+        p: Point,
+        t: f64,
+        outward_normal: Point,
+        material: Rc<Box<dyn Material>>,
+        ray: &Ray,
+    ) -> HitRecord {
         let front_face = HitRecord::is_front_face(&outward_normal, ray);
         let normal = if front_face {
             outward_normal.clone()
@@ -95,7 +122,7 @@ impl HitRecord {
             p,
             normal,
             t,
-            // front_face
+            material, // front_face
         }
     }
 
@@ -137,5 +164,71 @@ impl HittableList {
             }
         }
         temp_rec
+    }
+}
+
+pub trait Material {
+    fn scatter<'a>(
+        &self,
+        ray_in: &'a Ray,
+        hit_record: &'a HitRecord,
+        r: &mut Random,
+    ) -> Option<(Rc<Color>, Ray<'a>)>;
+}
+
+pub struct Lambertian {
+    albedo: Rc<Color>,
+}
+impl Lambertian {
+    pub fn new(albedo: Color) -> Lambertian {
+        Lambertian {
+            albedo: Rc::new(albedo),
+        }
+    }
+}
+impl Material for Lambertian {
+    fn scatter<'a>(
+        &self,
+        _: &'a Ray,
+        hit_record: &'a HitRecord,
+        r: &mut Random,
+    ) -> Option<(Rc<Color>, Ray<'a>)> {
+        let mut scatter_direction = &hit_record.normal.0 + &Vec3::random_unit_vector(r);
+        if scatter_direction.is_near_zero() {
+            scatter_direction = hit_record.normal.0.clone();
+        }
+        Some((
+            self.albedo.clone(),
+            Ray::new(&hit_record.p, Point(scatter_direction)),
+        ))
+    }
+}
+
+pub struct Metal {
+    albedo: Rc<Color>,
+}
+
+impl Metal {
+    pub fn new(albedo: Color) -> Metal {
+        Metal {
+            albedo: Rc::new(albedo),
+        }
+    }
+}
+
+impl Material for Metal {
+    fn scatter<'a>(
+        &self,
+        ray_in: &'a Ray,
+        hit_record: &'a HitRecord,
+        r: &mut Random,
+    ) -> Option<(Rc<Color>, Ray<'a>)> {
+        let mut reflected = ray_in.direction.0.unit_norm().reflect(&hit_record.normal.0);
+        let ray_out = Ray::new(&hit_record.p, Point(reflected));
+        if ray_out.direction.0.dot(&hit_record.normal.0) > 0.0 {
+            Some((self.albedo.clone(), ray_out))
+        } else {
+            None
+        }
     }
 }

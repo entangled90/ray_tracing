@@ -1,5 +1,8 @@
+use std::rc::Rc;
+use super::rand::Random;
 use crate::HitRecord;
 use crate::Hittable;
+use crate::Material;
 use crate::Ray;
 use std::ops::*;
 
@@ -26,6 +29,46 @@ impl Vec3 {
         Vec3 { x: v, y: v, z: v }
     }
 
+    pub fn random(r: &mut Random) -> Vec3 {
+        Vec3::new(r.random_double(), r.random_double(), r.random_double())
+    }
+
+    pub fn random_in(r: &mut Random, min: f64, max: f64) -> Vec3 {
+        Vec3::new(
+            r.random_double_in(min, max),
+            r.random_double_in(min, max),
+            r.random_double_in(min, max),
+        )
+    }
+
+    pub fn random_in_unit_sphere(r: &mut Random) -> Vec3 {
+        loop {
+            let p = Vec3::random_in(r, -1.0, 1.0);
+            if p.length_squared() < 1.0 {
+                return p;
+            }
+        }
+    }
+
+    pub fn random_unit_vector(r: &mut Random) -> Vec3 {
+        Vec3::random_in_unit_sphere(r).unit_norm()
+    }
+    const NEAR_ZERO: f64 = 1e-8;
+
+    pub fn is_near_zero(&self) -> bool {
+        Vec3::component_is_near_zero(self.x)
+            && Vec3::component_is_near_zero(self.y)
+            && Vec3::component_is_near_zero(self.z)
+    }
+
+    fn component_is_near_zero(x: f64) -> bool {
+        x.abs() < Vec3::NEAR_ZERO
+    }
+
+    pub fn reflect(&self, normal: &Vec3) -> Vec3{
+        self - &normal.scalar_mul(2.0 * self.dot(normal))
+    }
+
     pub fn as_slice(&self) -> [f64; 3] {
         [self.x, self.y, self.z]
     }
@@ -33,7 +76,7 @@ impl Vec3 {
         self.length_squared().sqrt()
     }
     pub fn length_squared(&self) -> f64 {
-        self.as_slice().iter().map(|c| *c * *c).sum::<f64>()
+        self.as_slice().iter().map(|c| c.powi(2)).sum::<f64>()
     }
 
     pub fn scalar_mul(&self, mult: f64) -> Vec3 {
@@ -42,6 +85,10 @@ impl Vec3 {
             y: self.y * mult,
             z: self.z * mult,
         }
+    }
+
+    pub fn index_wise_mul(&self, v: &Vec3) -> Vec3{
+        Vec3::new(self.x * v.x, self.y * v.y, self.z * v.z)
     }
     pub fn scalar_div(&self, mult: f64) -> Vec3 {
         self.scalar_mul(1.0 / mult)
@@ -163,6 +210,7 @@ pub struct Point(pub Vec3);
 pub struct Sphere {
     pub center: Point,
     pub radius: f64,
+    pub material: Rc<Box<dyn Material>>,
 }
 
 impl Hittable for Sphere {
@@ -170,7 +218,7 @@ impl Hittable for Sphere {
         let oc = &ray.origin.0 - &self.center.0;
         let a = ray.direction.0.length_squared();
         let half_b = &oc.dot(&ray.direction.0);
-        let c = &oc.length_squared() - self.radius.powf(2.0);
+        let c = &oc.length_squared() - self.radius.powi(2);
         let discriminant = half_b * half_b - a * c;
         if discriminant < 0.0 {
             return None;
@@ -186,7 +234,7 @@ impl Hittable for Sphere {
             let t = root;
             let p = ray.at(t);
             let normal = Point((&p.0 - &self.center.0).scalar_div(self.radius));
-            Some(HitRecord::new(p, t, normal, &ray))
+            Some(HitRecord::new(p, t, normal, self.material.clone(), &ray))
         }
     }
 }
