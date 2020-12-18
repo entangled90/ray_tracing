@@ -7,28 +7,50 @@ pub struct Color {
 }
 
 impl Color {
-    pub fn write<W>(&self, w: &mut W) -> std::io::Result<()>
+    pub fn new(vec: Vec3) -> Color {
+        Color { rgb: vec }
+    }
+    pub fn zero() -> Color {
+        Color::new(Vec3::iso(0.0))
+    }
+    pub fn write<W>(&self, w: &mut W, samples_per_pixel: u32) -> std::io::Result<()>
     where
         W: Write,
     {
+        let scale = 1.0 / samples_per_pixel as f64;
+
         w.write_fmt(format_args!(
             "{} {} {}\n",
-            (255.999 * self.rgb.x) as u32,
-            (255.999 * self.rgb.y) as u32,
-            (255.999 * self.rgb.z) as u32
+           (256.0 * Color::clamp_color(self.rgb.x * scale)) as u32,
+           (256.0 * Color::clamp_color(self.rgb.y * scale)) as u32,
+           (256.0 * Color::clamp_color(self.rgb.z * scale)) as u32
         ))?;
         Ok(())
+    }
+
+    fn clamp_color(x: f64) -> f64 {
+        Color::clamp(x, 0.0, 0.999)
+    }
+
+    fn clamp(x: f64, min: f64, max: f64) -> f64 {
+        if x < min {
+            min
+        } else if x > max {
+            max
+        } else {
+            x
+        }
     }
 }
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Ray {
-    pub origin: Point,
+    pub origin: &'static Point,
     pub direction: Point,
 }
 
 impl Ray {
-    pub fn new(origin: Point, direction: Point) -> Ray {
+    pub fn new(origin: &'static Point, direction: Point) -> Ray {
         Ray { origin, direction }
     }
 
