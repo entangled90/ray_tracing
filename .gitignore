@@ -1,1 +1,5 @@
 /target
+
+*.ppm
+perf.*
+*.svg

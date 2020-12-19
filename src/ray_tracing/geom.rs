@@ -1,8 +1,8 @@
 use std::rc::Rc;
 use super::rand::Random;
+use super::material::*;
 use crate::HitRecord;
 use crate::Hittable;
-use crate::Material;
 use crate::Ray;
 use std::ops::*;
 

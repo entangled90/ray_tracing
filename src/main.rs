@@ -10,6 +10,7 @@ use crate::ray_tracing::camera::*;
 use crate::ray_tracing::geom::*;
 use crate::ray_tracing::rand::*;
 use crate::ray_tracing::ray::*;
+use crate::ray_tracing::material::*;
 
 const ASPECT_RATIO: f64 = 16.0 / 9.0;
 const IMAGE_WIDTH: f64 = 400f64;
@@ -31,9 +32,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let material_center: Rc<Box<dyn Material>> =
         Rc::new(Box::new(Lambertian::new(Color::new_rgb(0.7, 0.3, 0.3))));
     let material_left: Rc<Box<dyn Material>> =
-        Rc::new(Box::new(Metal::new(Color::new_rgb(0.8, 0.8, 0.8))));
+        Rc::new(Box::new(Metal::new(Color::new_rgb(0.8, 0.8, 0.8), 0.3)));
     let material_right: Rc<Box<dyn Material>> =
-        Rc::new(Box::new(Metal::new(Color::new_rgb(0.8, 0.6, 0.2))));
+        Rc::new(Box::new(Metal::new(Color::new_rgb(0.8, 0.6, 0.2), 1.0)));
 
     let mut world = HittableList::new();
     world.add(Box::new(Sphere {
