@@ -1,5 +1,6 @@
+use std::sync::Arc;
+use std::ops::Add;
 use std::io::Write;
-use std::rc::Rc;
 
 use super::geom::*;
 use super::material::*;
@@ -55,6 +56,15 @@ impl Color {
     }
 }
 
+impl Add for Color {
+    type Output = Color;
+
+    fn add(self, w: Color) -> Color {
+        Color::new(&self.rgb + &w.rgb)
+    }
+}
+
+
 #[derive(PartialEq, Debug, Clone)]
 pub struct Ray<'a> {
     pub origin: &'a Point,
@@ -98,7 +108,7 @@ impl<'a> Ray<'a> {
 pub struct HitRecord {
     pub p: Point,
     pub normal: Point,
-    pub material: Rc<dyn Material>,
+    pub material: Arc<dyn Material>,
     pub t: f64,
     pub front_face: bool,
 }
@@ -108,7 +118,7 @@ impl HitRecord {
         p: Point,
         t: f64,
         outward_normal: Point,
-        material: Rc<dyn Material>,
+        material: Arc<dyn Material>,
         ray: &Ray,
     ) -> HitRecord {
         let front_face = HitRecord::is_front_face(&outward_normal, ray);
@@ -132,12 +142,12 @@ impl HitRecord {
     }
 }
 
-pub trait Hittable {
+pub trait Hittable : Send + Sync{
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
 }
 
 pub struct HittableList {
-    pub hittables: Vec<Box<dyn Hittable>>,
+    pub hittables: Vec<Arc<Box<dyn Hittable>>>,
 }
 
 impl HittableList {
@@ -147,7 +157,7 @@ impl HittableList {
         }
     }
     pub fn add(&mut self, hittable: Box<dyn Hittable>) {
-        self.hittables.push(hittable);
+        self.hittables.push(Arc::new(hittable));
     }
 
     pub fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {

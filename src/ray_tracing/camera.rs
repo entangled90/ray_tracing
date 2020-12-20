@@ -11,7 +11,6 @@ pub struct Camera {
     v: Point,
     w: Point,
     lens_radius: f64,
-    random: Random,
 }
 
 impl Camera {
@@ -23,7 +22,6 @@ impl Camera {
         aspect_ratio: f64,
         aperture: f64,
         focus_dist: f64,
-        random: Random,
     ) -> Camera {
         let theta = degrees_to_radians(vertical_fov);
         let h = (theta / 2.0).tan();
@@ -53,12 +51,11 @@ impl Camera {
             v: Point(v),
             w: Point(w),
             lens_radius: aperture / 2.0,
-            random,
         }
     }
 
-    pub fn ray(&mut self, s: f64, t: f64) -> Ray {
-        let rd = Vec3::random_in_unit_disk(&mut self.random).scalar_mul(self.lens_radius);
+    pub fn ray(&self, s: f64, t: f64) -> Ray {
+        let rd = Vec3::random_in_unit_disk(&mut Default::default()).scalar_mul(self.lens_radius);
         let offset = self.u.0.scalar_mul(rd.x) + self.v.0.scalar_mul(rd.y);
         Ray::new(
             &self.origin,

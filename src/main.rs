@@ -1,7 +1,7 @@
 mod ray_tracing;
 
+use std::sync::Arc;
 use std::io::{stderr, stdout, Write};
-use std::rc::Rc;
 
 use std::error::Error;
 use std::result::Result;
@@ -11,6 +11,7 @@ use crate::ray_tracing::geom::*;
 use crate::ray_tracing::material::*;
 use crate::ray_tracing::rand::*;
 use crate::ray_tracing::ray::*;
+use rayon::prelude::*;
 
 const ASPECT_RATIO: f64 = 3.0 / 2.0;
 const IMAGE_WIDTH: f64 = 1200f64;
@@ -22,7 +23,6 @@ fn init_camera() -> Camera {
     let view_up = Point(Vec3::new(0.0, 1.0, 0.0));
     let focus_dist = 10.0;
     let aperture = 0.01;
-    let random = Random::default();
     Camera::new(
         look_from,
         look_at,
@@ -31,17 +31,16 @@ fn init_camera() -> Camera {
         ASPECT_RATIO,
         aperture,
         focus_dist,
-        random,
     )
 }
 
 fn random_world() -> HittableList {
     let mut world = HittableList::new();
     let mut random = Random::default();
-    let material_ground: Rc<dyn Material> = Rc::new(Lambertian::new(Color::new_rgb(0.5, 0.5, 0.5)));
-    // let material_center: Rc<dyn Material> = Rc::new(Lambertian::new(Color::new_rgb(0.1, 0.2, 0.5)));
-    // let material_left: Rc<dyn Material> = Rc::new(Dielectric::new(1.5));
-    // let material_right: Rc<dyn Material> = Rc::new(Metal::new(Color::new_rgb(0.8, 0.6, 0.2), 0.0));
+    let material_ground: Arc<dyn Material> = Arc::new(Lambertian::new(Color::new_rgb(0.5, 0.5, 0.5)));
+    // let material_center: Arc<dyn Material> = Arc::new(Lambertian::new(Color::new_rgb(0.1, 0.2, 0.5)));
+    // let material_left: Arc<dyn Material> = Arc::new(Dielectric::new(1.5));
+    // let material_right: Arc<dyn Material> = Arc::new(Metal::new(Color::new_rgb(0.8, 0.6, 0.2), 0.0));
     world.add(Box::new(Sphere {
         center: Point(Vec3::new(0.0, -1000.0, 0.0)),
         radius: 1000.0,
@@ -58,19 +57,19 @@ fn random_world() -> HittableList {
             ));
 
             if (&center.0 - &Vec3::new(4.0, 0.2, 0.0)).length() > 0.9 {
-                let material: Rc<dyn Material> = match choose_mat {
+                let material: Arc<dyn Material> = match choose_mat {
                     //diffuse
                     m if m < 0.8 => {
                         let albedo = Vec3::random(&mut random).index_wise_mul(&Vec3::random(&mut random));
-                        Rc::new(Lambertian::new(Color::new(albedo)))
+                        Arc::new(Lambertian::new(Color::new(albedo)))
                     }
                     // metal
                     m if m < 0.95 => {
                         let albedo = Vec3::random_in(&mut random, 0.5, 1.0);
                         let fuzz = random.random_double();
-                        Rc::new(Metal::new(Color::new(albedo), fuzz))
+                        Arc::new(Metal::new(Color::new(albedo), fuzz))
                     }
-                    _ => Rc::new(Dielectric::new(1.5)),
+                    _ => Arc::new(Dielectric::new(1.5)),
                 };
                 world.add(Box::new(Sphere {
                     center,
@@ -84,17 +83,17 @@ fn random_world() -> HittableList {
     world.add(Box::new(Sphere {
         center: Point(Vec3::new(0.0, 1.0, 0.0)),
         radius: 1.0,
-        material: Rc::new(Dielectric::new(1.5)),
+        material: Arc::new(Dielectric::new(1.5)),
     }));
     world.add(Box::new(Sphere {
         center: Point(Vec3::new(-4.0, 1.0,0.0)),
         radius: 1.0,
-        material: Rc::new(Lambertian::new(Color::new(Vec3::new(0.4, 0.2, 0.1)))),
+        material: Arc::new(Lambertian::new(Color::new(Vec3::new(0.4, 0.2, 0.1)))),
     }));
     world.add(Box::new(Sphere {
         center: Point(Vec3::new(4.0, 1.0, 0.0)),
         radius: 1.0,
-        material: Rc::new(Metal::new(Color::new(Vec3::new(0.7, 0.6, 0.5)), 0.0)),
+        material: Arc::new(Metal::new(Color::new(Vec3::new(0.7, 0.6, 0.5)), 0.0)),
     }));
 
     world
@@ -109,8 +108,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let samples_per_pixel_f = samples_per_pixel as f64;
 
     let max_depth = 50;
-    let mut camera = init_camera();
-    let mut random = Random::default();
+    let camera = init_camera();
+    // let mut random = Random::default();
 
     out_handle.write_all(format!("P3\n{} {}\n{}\n", IMAGE_WIDTH, IMAGE_HEIGTH, 255).as_bytes())?;
 
@@ -118,19 +117,24 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let inverse_height = 1.0 / (IMAGE_HEIGTH - 1.0);
     let inverse_width = 1.0 / (IMAGE_WIDTH - 1.0);
-    for j in (0..IMAGE_HEIGTH as u32).rev() {
-        err_handle.write_fmt(format_args!("Scanlines remaining: {}\n", j))?;
-        for i in 0..IMAGE_WIDTH as u32 {
-            let mut color = Color::zero();
-            for _ in 0..samples_per_pixel {
+    let colors_matrix : Vec<Vec<Color>>= (0..IMAGE_HEIGTH as u32).rev().map(|j| {
+        err_handle.write_fmt(format_args!("Scanlines remaining: {}\n", j)).unwrap();
+        (0..IMAGE_WIDTH as u32).into_par_iter().map(|i|{
+            (0..samples_per_pixel).map(|_|{
+                let mut random = Random::default();
                 let u = (i as f64 + (random.random_double())) * inverse_width;
                 let v = (j as f64 + (random.random_double())) * inverse_height;
                 let ray = camera.ray(u, v);
-                color.rgb += ray.color(&world, max_depth, &mut random).rgb;
-            }
-            color.write(&mut out_handle, samples_per_pixel_f)?
-        }
+                ray.color(&world, max_depth, &mut random)
+            }).fold(Color::zero(), |acc, c| acc + c)
+        }).collect()
+    }).collect();
+
+    for colors in colors_matrix.iter(){
+        for color in colors.iter(){
+        color.write(&mut out_handle, samples_per_pixel_f).unwrap()
     }
+}
     err_handle.write_all(b"Done!\n")?;
     Ok(())
 }

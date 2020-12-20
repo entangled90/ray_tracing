@@ -1,24 +1,24 @@
+use std::sync::Arc;
 use super::geom::*;
 use super::rand::*;
 use super::ray::*;
-use std::rc::Rc;
 
-pub trait Material {
+pub trait Material: Send + Sync{
     fn scatter<'a>(
         &self,
         ray_in: &'a Ray,
         hit_record: &'a HitRecord,
         r: &mut Random,
-    ) -> Option<(Rc<Color>, Ray<'a>)>;
+    ) -> Option<(Arc<Color>, Ray<'a>)>;
 }
 
 pub struct Lambertian {
-    albedo: Rc<Color>,
+    albedo: Arc<Color>,
 }
 impl Lambertian {
     pub fn new(albedo: Color) -> Lambertian {
         Lambertian {
-            albedo: Rc::new(albedo),
+            albedo: Arc::new(albedo),
         }
     }
 }
@@ -28,7 +28,7 @@ impl Material for Lambertian {
         _: &'a Ray,
         hit_record: &'a HitRecord,
         r: &mut Random,
-    ) -> Option<(Rc<Color>, Ray<'a>)> {
+    ) -> Option<(Arc<Color>, Ray<'a>)> {
         let mut scatter_direction = &hit_record.normal.0 + &Vec3::random_unit_vector(r);
         if scatter_direction.is_near_zero() {
             scatter_direction = hit_record.normal.0.clone();
@@ -41,14 +41,14 @@ impl Material for Lambertian {
 }
 
 pub struct Metal {
-    albedo: Rc<Color>,
+    albedo: Arc<Color>,
     fuzz: f64,
 }
 
 impl Metal {
     pub fn new(albedo: Color, fuzz: f64) -> Metal {
         Metal {
-            albedo: Rc::new(albedo),
+            albedo: Arc::new(albedo),
             fuzz,
         }
     }
@@ -60,7 +60,7 @@ impl Material for Metal {
         ray_in: &'a Ray,
         hit_record: &'a HitRecord,
         r: &mut Random,
-    ) -> Option<(Rc<Color>, Ray<'a>)> {
+    ) -> Option<(Arc<Color>, Ray<'a>)> {
         let reflected = ray_in.direction.0.unit_norm().reflect(&hit_record.normal.0);
         let ray_out = Ray::new(
             &hit_record.p,
@@ -76,13 +76,13 @@ impl Material for Metal {
 
 pub struct Dielectric {
     refractive_index: f64,
-    attenuation: Rc<Color>,
+    attenuation: Arc<Color>,
 }
 impl Dielectric {
     pub fn new(refractive_index: f64) -> Dielectric {
         Dielectric {
             refractive_index,
-            attenuation: Rc::new(Color::new_rgb(1.0, 1.0, 1.0)),
+            attenuation: Arc::new(Color::new_rgb(1.0, 1.0, 1.0)),
         }
     }
 
@@ -98,7 +98,7 @@ impl Material for Dielectric {
         ray_in: &'a Ray,
         hit_record: &'a HitRecord,
         r: &mut Random,
-    ) -> Option<(Rc<Color>, Ray<'a>)> {
+    ) -> Option<(Arc<Color>, Ray<'a>)> {
         let refractive_ratio = if hit_record.front_face {
             1.0 / self.refractive_index
         } else {

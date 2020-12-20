@@ -1,10 +1,10 @@
+use std::sync::Arc;
 use super::material::*;
 use super::rand::Random;
 use crate::HitRecord;
 use crate::Hittable;
 use crate::Ray;
 use std::ops::*;
-use std::rc::Rc;
 
 pub const PI: f64 = 3.141_592_653_589_793;
 
@@ -231,7 +231,7 @@ pub struct Point(pub Vec3);
 pub struct Sphere {
     pub center: Point,
     pub radius: f64,
-    pub material: Rc<dyn Material>,
+    pub material: Arc<dyn Material>,
 }
 
 impl Hittable for Sphere {
