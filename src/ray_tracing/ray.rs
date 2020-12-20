@@ -19,11 +19,11 @@ impl Color {
     pub fn zero() -> Color {
         Color::new(Vec3::iso(0.0))
     }
-    pub fn write<W>(&self, w: &mut W, samples_per_pixel: u32) -> std::io::Result<()>
+    pub fn write<W>(&self, w: &mut W, samples_per_pixel: f64) -> std::io::Result<()>
     where
         W: Write,
     {
-        let scale = 1.0 / samples_per_pixel as f64;
+        let scale = 1.0 / samples_per_pixel;
         let r = (scale * self.rgb.x).sqrt();
         let g = (scale * self.rgb.y).sqrt();
         let b = (scale * self.rgb.z).sqrt();
