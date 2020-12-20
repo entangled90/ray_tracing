@@ -2,10 +2,14 @@ use rand::{rngs::ThreadRng, Rng};
 
 pub struct Random(ThreadRng);
 
-impl Random {
-    pub fn new() -> Random {
-        Random(rand::thread_rng())
+impl Default for Random{
+    fn default() -> Random{
+        Random(ThreadRng::default())
     }
+}
+
+impl Random {
+
     pub fn random_double(&mut self) -> f64 {
         self.0.gen()
     }

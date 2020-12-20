@@ -1,12 +1,12 @@
-use std::rc::Rc;
-use super::rand::Random;
 use super::material::*;
+use super::rand::Random;
 use crate::HitRecord;
 use crate::Hittable;
 use crate::Ray;
 use std::ops::*;
+use std::rc::Rc;
 
-pub const PI: f64 = 3.1415926535897932385;
+pub const PI: f64 = 3.141_592_653_589_793;
 
 pub const INFINITY: f64 = f64::INFINITY;
 
@@ -25,7 +25,7 @@ impl Vec3 {
         Vec3 { x, y, z }
     }
 
-    pub fn iso(v: f64) -> Vec3 {
+    pub const fn iso(v: f64) -> Vec3 {
         Vec3 { x: v, y: v, z: v }
     }
 
@@ -50,6 +50,19 @@ impl Vec3 {
         }
     }
 
+    pub fn random_in_unit_disk(r: &mut Random) -> Vec3 {
+        loop {
+            let p = Vec3::new(
+                r.random_double_in(-1.0, 1.0),
+                r.random_double_in(-1.0, 1.0),
+                0.0,
+            );
+            if p.length_squared() < 1.0 {
+                return p;
+            }
+        }
+    }
+
     pub fn random_unit_vector(r: &mut Random) -> Vec3 {
         Vec3::random_in_unit_sphere(r).unit_norm()
     }
@@ -65,18 +78,15 @@ impl Vec3 {
         x.abs() < Vec3::NEAR_ZERO
     }
 
-    pub fn reflect(&self, normal: &Vec3) -> Vec3{
-        self - &normal.scalar_mul(2.0 * self.dot(normal))
-    }
-
     pub fn as_slice(&self) -> [f64; 3] {
         [self.x, self.y, self.z]
     }
     pub fn length(&self) -> f64 {
         self.length_squared().sqrt()
     }
+
     pub fn length_squared(&self) -> f64 {
-        self.as_slice().iter().map(|c| c.powi(2)).sum::<f64>()
+        self.x.powi(2) + self.y.powi(2) + self.z.powi(2)
     }
 
     pub fn scalar_mul(&self, mult: f64) -> Vec3 {
@@ -87,7 +97,7 @@ impl Vec3 {
         }
     }
 
-    pub fn index_wise_mul(&self, v: &Vec3) -> Vec3{
+    pub fn index_wise_mul(&self, v: &Vec3) -> Vec3 {
         Vec3::new(self.x * v.x, self.y * v.y, self.z * v.z)
     }
     pub fn scalar_div(&self, mult: f64) -> Vec3 {
@@ -100,14 +110,25 @@ impl Vec3 {
 
     pub fn cross(&self, w: &Vec3) -> Vec3 {
         Vec3 {
-            x: self.y * w.z - self.z - w.y,
-            y: self.z * w.x - self.x - w.z,
-            z: self.x * w.y - self.y - w.x,
+            x: self.y * w.z - self.z * w.y,
+            y: self.z * w.x - self.x * w.z,
+            z: self.x * w.y - self.y * w.x,
         }
     }
 
     pub fn unit_norm(&self) -> Vec3 {
-        self.clone().scalar_div(self.length())
+        self.scalar_div(self.length())
+    }
+
+    pub fn reflect(&self, normal: &Vec3) -> Vec3 {
+        self - &normal.scalar_mul(2.0 * self.dot(normal))
+    }
+
+    pub fn refract(&self, normal: &Vec3, eta_ratio: f64) -> Vec3 {
+        let cos_theta = (-self.dot(normal)).min(1.0);
+        let out_perp = (self + &normal.scalar_mul(cos_theta)).scalar_mul(eta_ratio);
+        let out_parallel = normal.scalar_mul(-((1.0 - out_perp.length_squared().abs()).sqrt()));
+        out_perp + out_parallel
     }
 }
 
@@ -210,7 +231,7 @@ pub struct Point(pub Vec3);
 pub struct Sphere {
     pub center: Point,
     pub radius: f64,
-    pub material: Rc<Box<dyn Material>>,
+    pub material: Rc<dyn Material>,
 }
 
 impl Hittable for Sphere {
@@ -218,14 +239,16 @@ impl Hittable for Sphere {
         let oc = &ray.origin.0 - &self.center.0;
         let a = ray.direction.0.length_squared();
         let half_b = &oc.dot(&ray.direction.0);
-        let c = &oc.length_squared() - self.radius.powi(2);
+        let c = oc.length_squared() - self.radius.powi(2);
         let discriminant = half_b * half_b - a * c;
         if discriminant < 0.0 {
-            return None;
+            None
         } else {
             let discr_sqrt = discriminant.sqrt();
+            // first root
             let mut root = (-half_b - discr_sqrt) / a;
             if root < t_min || root > t_max {
+                // try second root
                 root = (-half_b + discr_sqrt) / a;
                 if root < t_min || root > t_max {
                     return None;
@@ -236,5 +259,18 @@ impl Hittable for Sphere {
             let normal = Point((&p.0 - &self.center.0).scalar_div(self.radius));
             Some(HitRecord::new(p, t, normal, self.material.clone(), &ray))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cross() {
+        let x = Vec3::new(1.0, 0.0, 0.0);
+        let y = Vec3::new(0.0, 1.0, 0.0);
+        let z = Vec3::new(0.0, 0.0, 1.0);
+        assert_eq!(x.cross(&y), z);
     }
 }

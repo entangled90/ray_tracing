@@ -1,47 +1,72 @@
 use super::geom::*;
 use super::ray::*;
-
-const ASPECT_RATIO: f64 = 16.0 / 9.0;
-
-const VIEWPORT_HEIGHT: f64 = 2.0;
-const VIEWPORT_WIDTH: f64 = ASPECT_RATIO * VIEWPORT_HEIGHT;
-const FOCAL_LENGTH: f64 = 1.0;
-
-const HORIZONTAL: Point = Point(Vec3::new(VIEWPORT_WIDTH, 0.0, 0.0));
-const VERTICAL: Point = Point(Vec3::new(0.0, VIEWPORT_HEIGHT, 0.0));
-const ORIGIN: Point = Point(Vec3::new(0.0, 0.0, 0.0));
+use crate::Random;
 
 pub struct Camera {
-    origin: &'static Point,
+    origin: Point,
     lower_left_corner: Point,
     horizontal: Point,
     vertical: Point,
+    u: Point,
+    v: Point,
+    w: Point,
+    lens_radius: f64,
+    random: Random,
 }
 
 impl Camera {
-    pub fn new() -> Camera {
-        let lower_left_corner = Point(
-            ORIGIN.0.clone()
-                - HORIZONTAL.0.scalar_div(2.0)
-                - VERTICAL.0.scalar_div(2.0)
-                - Vec3::new(0.0, 0.0, FOCAL_LENGTH),
-        );
+    pub fn new(
+        look_from: Point,
+        look_at: Point,
+        view_up: Point,
+        vertical_fov: f64,
+        aspect_ratio: f64,
+        aperture: f64,
+        focus_dist: f64,
+        random: Random,
+    ) -> Camera {
+        let theta = degrees_to_radians(vertical_fov);
+        let h = (theta / 2.0).tan();
 
+        let w = (&look_from.0 - &look_at.0).unit_norm();
+        let u = view_up.0.cross(&w).unit_norm();
+        let v = w.cross(&u);
+
+        let origin = look_from;
+        let viewport_height: f64 = 2.0 * h;
+        let viewport_width: f64 = aspect_ratio * viewport_height;
+
+        let horizontal: Point = Point(u.scalar_mul(viewport_width * focus_dist));
+        let vertical: Point = Point(v.scalar_mul(viewport_height * focus_dist));
+        let lower_left_corner = Point(
+            &origin.0
+                - &horizontal.0.scalar_div(2.0)
+                - vertical.0.scalar_div(2.0)
+                - w.scalar_mul(focus_dist),
+        );
         Camera {
-            origin: &ORIGIN,
+            origin,
             lower_left_corner,
-            horizontal: HORIZONTAL,
-            vertical: VERTICAL,
+            horizontal,
+            vertical,
+            u: Point(u),
+            v: Point(v),
+            w: Point(w),
+            lens_radius: aperture / 2.0,
+            random,
         }
     }
 
-    pub fn ray(&self, u: f64, v: f64) -> Ray {
+    pub fn ray(&mut self, s: f64, t: f64) -> Ray {
+        let rd = Vec3::random_in_unit_disk(&mut self.random).scalar_mul(self.lens_radius);
+        let offset = self.u.0.scalar_mul(rd.x) + self.v.0.scalar_mul(rd.y);
         Ray::new(
-            self.origin,
+            &self.origin,
             Point(
-                &(&(&self.lower_left_corner.0 + &self.horizontal.0.scalar_mul(u))
-                    + &self.vertical.0.scalar_mul(v))
-                    - &self.origin.0,
+                &(&(&(&self.lower_left_corner.0 + &self.horizontal.0.scalar_mul(s))
+                    + &self.vertical.0.scalar_mul(t))
+                    - &self.origin.0)
+                    - &offset,
             ),
         )
     }

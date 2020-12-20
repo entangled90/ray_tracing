@@ -2,8 +2,8 @@ use std::io::Write;
 use std::rc::Rc;
 
 use super::geom::*;
-use super::rand::*;
 use super::material::*;
+use super::rand::*;
 
 pub struct Color {
     pub rgb: Vec3,
@@ -67,28 +67,26 @@ impl<'a> Ray<'a> {
     }
 
     pub fn at(&self, t: f64) -> Point {
-        return Point(&self.origin.0 + &self.direction.0.scalar_mul(t));
+        Point(&self.origin.0 + &self.direction.0.scalar_mul(t))
     }
 
     pub fn color(&self, world: &HittableList, depth: u32, r: &mut Random) -> Color {
-        if depth <= 0 {
+        if depth == 0 {
             Color::zero()
+        } else if let Some(rec) = world.hit(&self, 0.001, INFINITY) {
+            match rec.material.scatter(self, &rec, r) {
+                Some((color, ray_out)) => Color::new(
+                    ray_out
+                        .color(world, depth - 1, r)
+                        .rgb
+                        .index_wise_mul(&color.rgb),
+                ),
+                None => Color::zero(),
+            }
         } else {
-            if let Some(rec) = world.hit(&self, 0.001, INFINITY) {
-                match rec.material.scatter(self, &rec, r) {
-                    Some((color, ray_out)) => Color::new(
-                        ray_out
-                            .color(world, depth - 1, r)
-                            .rgb
-                            .index_wise_mul(&color.rgb),
-                    ),
-                    None => Color::zero(),
-                }
-            } else {
-                let t = 0.5 * (self.direction.0.unit_norm().y + 1.0);
-                Color {
-                    rgb: Ray::VEC_ISO_1.scalar_mul(1.0 - t) + Ray::VEC_COLOR.scalar_mul(t),
-                }
+            let t = 0.5 * (self.direction.0.unit_norm().y + 1.0);
+            Color {
+                rgb: Ray::VEC_ISO_1.scalar_mul(1.0 - t) + Ray::VEC_COLOR.scalar_mul(t),
             }
         }
     }
@@ -100,9 +98,9 @@ impl<'a> Ray<'a> {
 pub struct HitRecord {
     pub p: Point,
     pub normal: Point,
-    pub material: Rc<Box<dyn Material>>,
+    pub material: Rc<dyn Material>,
     pub t: f64,
-    // pub front_face: bool,
+    pub front_face: bool,
 }
 
 impl HitRecord {
@@ -110,12 +108,12 @@ impl HitRecord {
         p: Point,
         t: f64,
         outward_normal: Point,
-        material: Rc<Box<dyn Material>>,
+        material: Rc<dyn Material>,
         ray: &Ray,
     ) -> HitRecord {
         let front_face = HitRecord::is_front_face(&outward_normal, ray);
         let normal = if front_face {
-            outward_normal.clone()
+            outward_normal
         } else {
             Point(-&outward_normal.0)
         };
@@ -123,7 +121,8 @@ impl HitRecord {
             p,
             normal,
             t,
-            material, // front_face
+            material,
+            front_face,
         }
     }
 
@@ -156,15 +155,11 @@ impl HittableList {
         let mut closest_so_far = t_max;
         for object in &self.hittables {
             // note closest_so_far is used as t_max
-            match object.hit(ray, t_min, closest_so_far) {
-                Some(rec) => {
-                    closest_so_far = rec.t;
-                    temp_rec = Some(rec);
-                }
-                None => (),
+            if let Some(rec) = object.hit(ray, t_min, closest_so_far) {
+                closest_so_far = rec.t;
+                temp_rec = Some(rec);
             }
         }
         temp_rec
     }
 }
-
