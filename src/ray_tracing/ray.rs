@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use crate::Object;
 use std::ops::Add;
 use std::io::Write;
 
@@ -20,11 +20,10 @@ impl Color {
     pub fn zero() -> Color {
         Color::new(Vec3::iso(0.0))
     }
-    pub fn write<W>(&self, w: &mut W, samples_per_pixel: f64) -> std::io::Result<()>
+    pub fn write<W>(&self, w: &mut W, scale: f64) -> std::io::Result<()>
     where
         W: Write,
     {
-        let scale = 1.0 / samples_per_pixel;
         let r = (scale * self.rgb.x).sqrt();
         let g = (scale * self.rgb.y).sqrt();
         let b = (scale * self.rgb.z).sqrt();
@@ -105,29 +104,29 @@ impl<'a> Ray<'a> {
     const VEC_ISO_1: Vec3 = Vec3::new(1.0, 1.0, 1.0);
 }
 
-pub struct HitRecord {
+pub struct HitRecord<'a> {
     pub p: Point,
     pub normal: Point,
-    pub material: Arc<dyn Material>,
+    pub material: &'a Material,
     pub t: f64,
     pub front_face: bool,
 }
 
-impl HitRecord {
+impl <'a> HitRecord<'a> {
     pub fn new(
         p: Point,
         t: f64,
         outward_normal: Point,
-        material: Arc<dyn Material>,
+        material: &'a Material,
         ray: &Ray,
-    ) -> HitRecord {
+    ) -> HitRecord<'a> {
         let front_face = HitRecord::is_front_face(&outward_normal, ray);
         let normal = if front_face {
             outward_normal
         } else {
             Point(-&outward_normal.0)
         };
-        HitRecord {
+        HitRecord{
             p,
             normal,
             t,
@@ -142,12 +141,9 @@ impl HitRecord {
     }
 }
 
-pub trait Hittable : Send + Sync{
-    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
-}
 
 pub struct HittableList {
-    pub hittables: Vec<Arc<Box<dyn Hittable>>>,
+    pub hittables: Vec<Object>,
 }
 
 impl HittableList {
@@ -156,8 +152,8 @@ impl HittableList {
             hittables: Vec::with_capacity(64),
         }
     }
-    pub fn add(&mut self, hittable: Box<dyn Hittable>) {
-        self.hittables.push(Arc::new(hittable));
+    pub fn add(&mut self, hittable: Object) {
+        self.hittables.push(hittable);
     }
 
     pub fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {

@@ -1,0 +1,46 @@
+
+use crate::Ray;
+use crate::HitRecord;
+use crate::Material;
+use crate::Point;
+use Object::*;
+
+pub enum Object{
+    Sphere {
+        center: Point,
+        radius: f64,
+        material: Material,
+    },
+}
+impl Object{
+    pub fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>{
+        match self{
+            Sphere{center, radius, material}=>  {
+                let oc = &ray.origin.0 - &center.0;
+                let a = ray.direction.0.length_squared();
+                let half_b = &oc.dot(&ray.direction.0);
+                let c = oc.length_squared() - radius.powi(2);
+                let discriminant = half_b * half_b - a * c;
+                if discriminant < 0.0 {
+                    None
+                } else {
+                    let discr_sqrt = discriminant.sqrt();
+                    // first root
+                    let mut root = (-half_b - discr_sqrt) / a;
+                    if root < t_min || root > t_max {
+                        // try second root
+                        root = (-half_b + discr_sqrt) / a;
+                        if root < t_min || root > t_max {
+                            return None;
+                        }
+                    }
+                    let t = root;
+                    let p = ray.at(t);
+                    let normal = Point((&p.0 - &center.0).scalar_div(*radius));
+                    Some(HitRecord::new(p, t, normal, &material, &ray))
+                }
+            }
+        }
+    }
+
+}

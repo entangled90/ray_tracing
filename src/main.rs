@@ -1,6 +1,5 @@
 mod ray_tracing;
 
-use std::sync::Arc;
 use std::io::{stderr, stdout, Write};
 
 use std::error::Error;
@@ -9,6 +8,7 @@ use std::result::Result;
 use crate::ray_tracing::camera::*;
 use crate::ray_tracing::geom::*;
 use crate::ray_tracing::material::*;
+use crate::ray_tracing::object::*;
 use crate::ray_tracing::rand::*;
 use crate::ray_tracing::ray::*;
 use rayon::prelude::*;
@@ -37,15 +37,12 @@ fn init_camera() -> Camera {
 fn random_world() -> HittableList {
     let mut world = HittableList::new();
     let mut random = Random::default();
-    let material_ground: Arc<dyn Material> = Arc::new(Lambertian::new(Color::new_rgb(0.5, 0.5, 0.5)));
-    // let material_center: Arc<dyn Material> = Arc::new(Lambertian::new(Color::new_rgb(0.1, 0.2, 0.5)));
-    // let material_left: Arc<dyn Material> = Arc::new(Dielectric::new(1.5));
-    // let material_right: Arc<dyn Material> = Arc::new(Metal::new(Color::new_rgb(0.8, 0.6, 0.2), 0.0));
-    world.add(Box::new(Sphere {
+    let material_ground = Material::new_lambertian(Color::new_rgb(0.5, 0.5, 0.5));
+    world.add(Object::Sphere {
         center: Point(Vec3::new(0.0, -1000.0, 0.0)),
         radius: 1000.0,
         material: material_ground,
-    }));
+    });
 
     for a in -11..11 {
         for b in -11..11 {
@@ -57,44 +54,45 @@ fn random_world() -> HittableList {
             ));
 
             if (&center.0 - &Vec3::new(4.0, 0.2, 0.0)).length() > 0.9 {
-                let material: Arc<dyn Material> = match choose_mat {
+                let material: Material = match choose_mat {
                     //diffuse
                     m if m < 0.8 => {
-                        let albedo = Vec3::random(&mut random).index_wise_mul(&Vec3::random(&mut random));
-                        Arc::new(Lambertian::new(Color::new(albedo)))
+                        let albedo =
+                            Vec3::random(&mut random).index_wise_mul(&Vec3::random(&mut random));
+                        Material::new_lambertian(Color::new(albedo))
                     }
                     // metal
                     m if m < 0.95 => {
                         let albedo = Vec3::random_in(&mut random, 0.5, 1.0);
                         let fuzz = random.random_double();
-                        Arc::new(Metal::new(Color::new(albedo), fuzz))
+                        Material::new_metal(Color::new(albedo), fuzz)
                     }
-                    _ => Arc::new(Dielectric::new(1.5)),
+                    _ => Material::new_dielectric(1.5),
                 };
-                world.add(Box::new(Sphere {
+                world.add(Object::Sphere {
                     center,
                     radius: 0.2,
                     material,
-                }));
+                });
             }
         }
     }
 
-    world.add(Box::new(Sphere {
+    world.add(Object::Sphere {
         center: Point(Vec3::new(0.0, 1.0, 0.0)),
         radius: 1.0,
-        material: Arc::new(Dielectric::new(1.5)),
-    }));
-    world.add(Box::new(Sphere {
-        center: Point(Vec3::new(-4.0, 1.0,0.0)),
+        material: Material::new_dielectric(1.5),
+    });
+    world.add(Object::Sphere {
+        center: Point(Vec3::new(-4.0, 1.0, 0.0)),
         radius: 1.0,
-        material: Arc::new(Lambertian::new(Color::new(Vec3::new(0.4, 0.2, 0.1)))),
-    }));
-    world.add(Box::new(Sphere {
+        material: Material::new_lambertian(Color::new(Vec3::new(0.4, 0.2, 0.1))),
+    });
+    world.add(Object::Sphere {
         center: Point(Vec3::new(4.0, 1.0, 0.0)),
         radius: 1.0,
-        material: Arc::new(Metal::new(Color::new(Vec3::new(0.7, 0.6, 0.5)), 0.0)),
-    }));
+        material: Material::new_metal(Color::new(Vec3::new(0.7, 0.6, 0.5)), 0.0),
+    });
 
     world
 }
@@ -117,24 +115,36 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let inverse_height = 1.0 / (IMAGE_HEIGTH - 1.0);
     let inverse_width = 1.0 / (IMAGE_WIDTH - 1.0);
-    let colors_matrix : Vec<Vec<Color>>= (0..IMAGE_HEIGTH as u32).rev().map(|j| {
-        err_handle.write_fmt(format_args!("Scanlines remaining: {}\n", j)).unwrap();
-        (0..IMAGE_WIDTH as u32).into_par_iter().map(|i|{
-            (0..samples_per_pixel).map(|_|{
-                let mut random = Random::default();
-                let u = (i as f64 + (random.random_double())) * inverse_width;
-                let v = (j as f64 + (random.random_double())) * inverse_height;
-                let ray = camera.ray(u, v);
-                ray.color(&world, max_depth, &mut random)
-            }).fold(Color::zero(), |acc, c| acc + c)
-        }).collect()
-    }).collect();
+    let colors_matrix: Vec<Vec<Color>> = (0..IMAGE_HEIGTH as u32)
+        .rev()
+        .map(|j| {
+            err_handle
+                .write_fmt(format_args!("Scanlines remaining: {}\n", j))
+                .unwrap();
+            (0..IMAGE_WIDTH as u32)
+                .into_par_iter()
+                .map(|i| {
+                    (0..samples_per_pixel)
+                        .map(|_| {
+                            let mut random = Random::default();
+                            let u = (i as f64 + (random.random_double())) * inverse_width;
+                            let v = (j as f64 + (random.random_double())) * inverse_height;
+                            let ray = camera.ray(u, v, &mut random);
+                            ray.color(&world, max_depth, &mut random)
+                        })
+                        .fold(Color::zero(), |acc, c| acc + c)
+                })
+                .collect()
+        })
+        .collect();
 
-    for colors in colors_matrix.iter(){
-        for color in colors.iter(){
-        color.write(&mut out_handle, samples_per_pixel_f).unwrap()
+    let scale = 1.0 / samples_per_pixel_f;
+
+    for colors in colors_matrix.iter() {
+        for color in colors.iter() {
+            color.write(&mut out_handle, scale)?
+        }
     }
-}
     err_handle.write_all(b"Done!\n")?;
     Ok(())
 }

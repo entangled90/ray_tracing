@@ -54,8 +54,8 @@ impl Camera {
         }
     }
 
-    pub fn ray(&self, s: f64, t: f64) -> Ray {
-        let rd = Vec3::random_in_unit_disk(&mut Default::default()).scalar_mul(self.lens_radius);
+    pub fn ray(&self, s: f64, t: f64, r: &mut Random) -> Ray {
+        let rd = Vec3::random_in_unit_disk(r).scalar_mul(self.lens_radius);
         let offset = self.u.0.scalar_mul(rd.x) + self.v.0.scalar_mul(rd.y);
         Ray::new(
             &self.origin,

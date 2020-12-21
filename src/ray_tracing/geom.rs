@@ -1,9 +1,5 @@
-use std::sync::Arc;
-use super::material::*;
 use super::rand::Random;
-use crate::HitRecord;
-use crate::Hittable;
-use crate::Ray;
+
 use std::ops::*;
 
 pub const PI: f64 = 3.141_592_653_589_793;
@@ -227,40 +223,6 @@ impl Neg for &Vec3 {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Point(pub Vec3);
-
-pub struct Sphere {
-    pub center: Point,
-    pub radius: f64,
-    pub material: Arc<dyn Material>,
-}
-
-impl Hittable for Sphere {
-    fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
-        let oc = &ray.origin.0 - &self.center.0;
-        let a = ray.direction.0.length_squared();
-        let half_b = &oc.dot(&ray.direction.0);
-        let c = oc.length_squared() - self.radius.powi(2);
-        let discriminant = half_b * half_b - a * c;
-        if discriminant < 0.0 {
-            None
-        } else {
-            let discr_sqrt = discriminant.sqrt();
-            // first root
-            let mut root = (-half_b - discr_sqrt) / a;
-            if root < t_min || root > t_max {
-                // try second root
-                root = (-half_b + discr_sqrt) / a;
-                if root < t_min || root > t_max {
-                    return None;
-                }
-            }
-            let t = root;
-            let p = ray.at(t);
-            let normal = Point((&p.0 - &self.center.0).scalar_div(self.radius));
-            Some(HitRecord::new(p, t, normal, self.material.clone(), &ray))
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
