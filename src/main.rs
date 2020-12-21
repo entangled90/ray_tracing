@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut out_handle = stdout.lock();
     let stderr = stderr();
     let mut err_handle = stderr.lock();
-    let samples_per_pixel = 100u32;
+    let samples_per_pixel = 50u32;
     let samples_per_pixel_f = samples_per_pixel as f64;
 
     let max_depth = 50;
@@ -116,17 +116,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     let inverse_height = 1.0 / (IMAGE_HEIGTH - 1.0);
     let inverse_width = 1.0 / (IMAGE_WIDTH - 1.0);
     let colors_matrix: Vec<Vec<Color>> = (0..IMAGE_HEIGTH as u32)
-        .rev()
+    .into_par_iter()    
+    .rev()
         .map(|j| {
-            err_handle
-                .write_fmt(format_args!("Scanlines remaining: {}\n", j))
-                .unwrap();
+            // err_handle
+            //     .write_fmt(format_args!("Scanlines remaining: {}\n", j))
+            //     .unwrap();
             (0..IMAGE_WIDTH as u32)
-                .into_par_iter()
                 .map(|i| {
+                    let mut random = Random::default();
                     (0..samples_per_pixel)
                         .map(|_| {
-                            let mut random = Random::default();
                             let u = (i as f64 + (random.random_double())) * inverse_width;
                             let v = (j as f64 + (random.random_double())) * inverse_height;
                             let ray = camera.ray(u, v, &mut random);
