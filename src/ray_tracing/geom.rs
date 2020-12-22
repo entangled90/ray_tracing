@@ -2,26 +2,26 @@ use super::rand::Random;
 
 use std::ops::*;
 
-pub const PI: f64 = 3.141_592_653_589_793;
+pub const PI: f32 = 3.141_592_653_589_793;
 
-pub const INFINITY: f64 = f64::INFINITY;
+pub const INFINITY: f32 = f32::INFINITY;
 
-pub fn degrees_to_radians(degrees: f64) -> f64 {
+pub fn degrees_to_radians(degrees: f32) -> f32 {
     degrees * PI / 180.0
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Vec3 {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
 }
 impl Vec3 {
-    pub const fn new(x: f64, y: f64, z: f64) -> Vec3 {
+    pub const fn new(x: f32, y: f32, z: f32) -> Vec3 {
         Vec3 { x, y, z }
     }
 
-    pub const fn iso(v: f64) -> Vec3 {
+    pub const fn iso(v: f32) -> Vec3 {
         Vec3 { x: v, y: v, z: v }
     }
 
@@ -29,7 +29,7 @@ impl Vec3 {
         Vec3::new(r.random_double(), r.random_double(), r.random_double())
     }
 
-    pub fn random_in(r: &mut Random, min: f64, max: f64) -> Vec3 {
+    pub fn random_in(r: &mut Random, min: f32, max: f32) -> Vec3 {
         Vec3::new(
             r.random_double_in(min, max),
             r.random_double_in(min, max),
@@ -62,7 +62,7 @@ impl Vec3 {
     pub fn random_unit_vector(r: &mut Random) -> Vec3 {
         Vec3::random_in_unit_sphere(r).unit_norm()
     }
-    const NEAR_ZERO: f64 = 1e-8;
+    const NEAR_ZERO: f32 = 1e-8;
 
     pub fn is_near_zero(&self) -> bool {
         Vec3::component_is_near_zero(self.x)
@@ -70,22 +70,22 @@ impl Vec3 {
             && Vec3::component_is_near_zero(self.z)
     }
 
-    fn component_is_near_zero(x: f64) -> bool {
+    fn component_is_near_zero(x: f32) -> bool {
         x.abs() < Vec3::NEAR_ZERO
     }
 
-    pub fn as_slice(&self) -> [f64; 3] {
+    pub fn as_slice(&self) -> [f32; 3] {
         [self.x, self.y, self.z]
     }
-    pub fn length(&self) -> f64 {
+    pub fn length(&self) -> f32 {
         self.length_squared().sqrt()
     }
 
-    pub fn length_squared(&self) -> f64 {
+    pub fn length_squared(&self) -> f32 {
         self.x.powi(2) + self.y.powi(2) + self.z.powi(2)
     }
 
-    pub fn scalar_mul(&self, mult: f64) -> Vec3 {
+    pub fn scalar_mul(&self, mult: f32) -> Vec3 {
         Vec3 {
             x: self.x * mult,
             y: self.y * mult,
@@ -96,11 +96,11 @@ impl Vec3 {
     pub fn index_wise_mul(&self, v: &Vec3) -> Vec3 {
         Vec3::new(self.x * v.x, self.y * v.y, self.z * v.z)
     }
-    pub fn scalar_div(&self, mult: f64) -> Vec3 {
+    pub fn scalar_div(&self, mult: f32) -> Vec3 {
         self.scalar_mul(1.0 / mult)
     }
 
-    pub fn dot(&self, w: &Vec3) -> f64 {
+    pub fn dot(&self, w: &Vec3) -> f32 {
         self.x * w.x + self.y * w.y + self.z * w.z
     }
 
@@ -120,7 +120,7 @@ impl Vec3 {
         self - &normal.scalar_mul(2.0 * self.dot(normal))
     }
 
-    pub fn refract(&self, normal: &Vec3, eta_ratio: f64) -> Vec3 {
+    pub fn refract(&self, normal: &Vec3, eta_ratio: f32) -> Vec3 {
         let cos_theta = (-self.dot(normal)).min(1.0);
         let out_perp = (self + &normal.scalar_mul(cos_theta)).scalar_mul(eta_ratio);
         let out_parallel = normal.scalar_mul(-((1.0 - out_perp.length_squared().abs()).sqrt()));

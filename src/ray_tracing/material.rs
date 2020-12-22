@@ -9,16 +9,16 @@ pub enum Material{
     },
     Metal {
         albedo: Color,
-        fuzz: f64,
+        fuzz: f32,
     },
     Dielectric {
-        refractive_index: f64,
+        refractive_index: f32,
         attenuation: Color,
     }
 
 }
 impl Material{
-    pub fn new_dielectric(refractive_index: f64) -> Material {
+    pub fn new_dielectric(refractive_index: f32) -> Material {
         Dielectric {
             refractive_index,
             attenuation: Color::new_rgb(1.0, 1.0, 1.0),
@@ -30,7 +30,7 @@ impl Material{
         }
     }
 
-    pub fn new_metal(albedo: Color, fuzz: f64) -> Material {
+    pub fn new_metal(albedo: Color, fuzz: f32) -> Material {
         Metal {
             albedo,
             fuzz,
@@ -88,7 +88,6 @@ impl Material{
                     unit_direction.refract(&hit_record.normal.0, refractive_ratio)
                 };
         
-                assert_eq!((ray_out.length_squared() - 1.0).abs() < 1e7, true);
                 Some((
                     &attenuation,
                     Ray::new(&hit_record.p, Point(ray_out)),
@@ -98,7 +97,7 @@ impl Material{
     }
 
 
-    pub fn reflectance(refractive_index: f64, cosine: f64) -> f64 {
+    pub fn reflectance(refractive_index: f32, cosine: f32) -> f32 {
         let r0 = ((1.0 - refractive_index) / (1.0 + refractive_index)).powi(2);
         r0 + (1.0 - r0) * ((1.0 - cosine).powi(5))
     }

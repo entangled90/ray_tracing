@@ -1,20 +1,20 @@
-use rand::{rngs::ThreadRng, Rng};
+use rand::*;
 
-pub struct Random(ThreadRng);
+pub struct Random(rngs::ThreadRng);
 
 impl Default for Random{
     fn default() -> Random{
-        Random(ThreadRng::default())
+        Random(rngs::ThreadRng::default())
     }
 }
 
 impl Random {
 
-    pub fn random_double(&mut self) -> f64 {
+    pub fn random_double(&mut self) -> f32 {
         self.0.gen()
     }
 
-    pub fn random_double_in(&mut self, min: f64, max: f64) -> f64 {
+    pub fn random_double_in(&mut self, min: f32, max: f32) -> f32 {
         min + (max - min) * self.random_double()
     }
 }

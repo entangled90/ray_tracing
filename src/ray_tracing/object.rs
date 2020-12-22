@@ -8,12 +8,12 @@ use Object::*;
 pub enum Object{
     Sphere {
         center: Point,
-        radius: f64,
+        radius: f32,
         material: Material,
     },
 }
 impl Object{
-    pub fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>{
+    pub fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord>{
         match self{
             Sphere{center, radius, material}=>  {
                 let oc = &ray.origin.0 - &center.0;

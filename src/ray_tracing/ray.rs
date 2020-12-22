@@ -1,3 +1,4 @@
+use std::iter::Sum;
 use crate::Object;
 use std::ops::Add;
 use std::io::Write;
@@ -11,7 +12,7 @@ pub struct Color {
 }
 
 impl Color {
-    pub fn new_rgb(r: f64, g: f64, b: f64) -> Color {
+    pub fn new_rgb(r: f32, g: f32, b: f32) -> Color {
         Color::new(Vec3::new(r, g, b))
     }
     pub fn new(vec: Vec3) -> Color {
@@ -20,7 +21,7 @@ impl Color {
     pub fn zero() -> Color {
         Color::new(Vec3::iso(0.0))
     }
-    pub fn write<W>(&self, w: &mut W, scale: f64) -> std::io::Result<()>
+    pub fn write<W>(&self, w: &mut W, scale: f32) -> std::io::Result<()>
     where
         W: Write,
     {
@@ -36,15 +37,15 @@ impl Color {
         Ok(())
     }
 
-    fn scale_color_component(c: f64) -> u8 {
+    fn scale_color_component(c: f32) -> u8 {
         (256.0 * Color::clamp_color(c)) as u8
     }
 
-    fn clamp_color(x: f64) -> f64 {
+    fn clamp_color(x: f32) -> f32 {
         Color::clamp(x, 0.0, 0.999)
     }
 
-    fn clamp(x: f64, min: f64, max: f64) -> f64 {
+    fn clamp(x: f32, min: f32, max: f32) -> f32 {
         if x < min {
             min
         } else if x > max {
@@ -63,6 +64,17 @@ impl Add for Color {
     }
 }
 
+impl Sum for Color{
+    fn sum<I>(iter: I) -> Color 
+    where I: Iterator<Item = Color> { 
+        let mut zero = Vec3::iso(0.0);
+        for el in iter{
+            zero += el.rgb;
+        }
+        Color::new(zero)
+ }
+}
+
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Ray<'a> {
@@ -75,7 +87,7 @@ impl<'a> Ray<'a> {
         Ray { origin, direction }
     }
 
-    pub fn at(&self, t: f64) -> Point {
+    pub fn at(&self, t: f32) -> Point {
         Point(&self.origin.0 + &self.direction.0.scalar_mul(t))
     }
 
@@ -108,14 +120,14 @@ pub struct HitRecord<'a> {
     pub p: Point,
     pub normal: Point,
     pub material: &'a Material,
-    pub t: f64,
+    pub t: f32,
     pub front_face: bool,
 }
 
 impl <'a> HitRecord<'a> {
     pub fn new(
         p: Point,
-        t: f64,
+        t: f32,
         outward_normal: Point,
         material: &'a Material,
         ray: &Ray,
@@ -156,7 +168,7 @@ impl HittableList {
         self.hittables.push(hittable);
     }
 
-    pub fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+    pub fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
         let mut temp_rec: Option<HitRecord> = None;
         let mut closest_so_far = t_max;
         for object in &self.hittables {

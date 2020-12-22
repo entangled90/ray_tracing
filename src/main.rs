@@ -13,9 +13,9 @@ use crate::ray_tracing::rand::*;
 use crate::ray_tracing::ray::*;
 use rayon::prelude::*;
 
-const ASPECT_RATIO: f64 = 3.0 / 2.0;
-const IMAGE_WIDTH: f64 = 1200f64;
-const IMAGE_HEIGTH: f64 = IMAGE_WIDTH / ASPECT_RATIO;
+const ASPECT_RATIO: f32 = 3.0 / 2.0;
+const IMAGE_WIDTH: f32 = 1200f32;
+const IMAGE_HEIGTH: f32 = IMAGE_WIDTH / ASPECT_RATIO;
 
 fn init_camera() -> Camera {
     let look_from = Point(Vec3::new(13.0, 2.0, 3.0));
@@ -48,9 +48,9 @@ fn random_world() -> HittableList {
         for b in -11..11 {
             let choose_mat = random.random_double();
             let center = Point(Vec3::new(
-                a as f64 + 0.9 * random.random_double(),
+                a as f32 + 0.9 * random.random_double(),
                 0.2,
-                b as f64 + 0.9 * random.random_double(),
+                b as f32 + 0.9 * random.random_double(),
             ));
 
             if (&center.0 - &Vec3::new(4.0, 0.2, 0.0)).length() > 0.9 {
@@ -102,8 +102,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut out_handle = stdout.lock();
     let stderr = stderr();
     let mut err_handle = stderr.lock();
-    let samples_per_pixel = 100u32;
-    let samples_per_pixel_f = samples_per_pixel as f64;
+    let samples_per_pixel = 500u32;
+    let samples_per_pixel_f = samples_per_pixel as f32;
 
     let max_depth = 50;
     let camera = init_camera();
@@ -112,36 +112,33 @@ fn main() -> Result<(), Box<dyn Error>> {
     out_handle.write_all(format!("P3\n{} {}\n{}\n", IMAGE_WIDTH, IMAGE_HEIGTH, 255).as_bytes())?;
 
     let world = random_world();
-
     let inverse_height = 1.0 / (IMAGE_HEIGTH - 1.0);
     let inverse_width = 1.0 / (IMAGE_WIDTH - 1.0);
     let colors_matrix: Vec<Vec<Color>> = (0..IMAGE_HEIGTH as u32)
+        .into_par_iter()
         .rev()
         .map(|j| {
-            err_handle
-                .write_fmt(format_args!("Scanlines remaining: {}\n", j))
-                .unwrap();
-            (0..IMAGE_WIDTH as u32)
-                .into_par_iter()
-                .map(|i| {
-                    (0..samples_per_pixel)
-                        .map(|_| {
-                            let mut random = Random::default();
-                            let u = (i as f64 + (random.random_double())) * inverse_width;
-                            let v = (j as f64 + (random.random_double())) * inverse_height;
-                            let ray = camera.ray(u, v, &mut random);
-                            ray.color(&world, max_depth, &mut random)
-                        })
-                        .fold(Color::zero(), |acc, c| acc + c)
-                })
-                .collect()
+            let mut random = Random::default();
+            // err_handle
+            //     .write_fmt(format_args!("Scanlines remaining: {}\n", j))
+            //     .unwrap();
+            (0..IMAGE_WIDTH as u32).map(|i| {
+                (0..samples_per_pixel)
+                    .map(|_| {
+                        let u = (i as f32 + (random.random_double())) * inverse_width;
+                        let v = (j as f32 + (random.random_double())) * inverse_height;
+                        let ray = camera.ray(u, v, &mut random);
+                        ray.color(&world, max_depth, &mut random)
+                    })
+                    .sum()
+            }).collect()
         })
         .collect();
 
     let scale = 1.0 / samples_per_pixel_f;
 
     for colors in colors_matrix.iter() {
-        for color in colors.iter() {
+        for color in colors {
             color.write(&mut out_handle, scale)?
         }
     }
