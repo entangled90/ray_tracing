@@ -1,23 +1,24 @@
-
 use crate::Object;
 
+use super::color::*;
 use super::geom::*;
 use super::material::*;
 use super::rand::*;
-use super::color::*;
-
-
-
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Ray<'a> {
     pub origin: &'a Point,
     pub direction: Point,
+    pub time: f32,
 }
 
 impl<'a> Ray<'a> {
-    pub fn new(origin: &'a Point, direction: Point) -> Ray {
-        Ray { origin, direction }
+    pub fn new(origin: &'a Point, direction: Point, time: f32) -> Ray {
+        Ray {
+            origin,
+            direction,
+            time,
+        }
     }
 
     pub fn at(&self, t: f32) -> Point {
@@ -57,7 +58,7 @@ pub struct HitRecord<'a> {
     pub front_face: bool,
 }
 
-impl <'a> HitRecord<'a> {
+impl<'a> HitRecord<'a> {
     pub fn new(
         p: Point,
         t: f32,
@@ -71,7 +72,7 @@ impl <'a> HitRecord<'a> {
         } else {
             Point(-&outward_normal.0)
         };
-        HitRecord{
+        HitRecord {
             p,
             normal,
             t,
@@ -85,7 +86,6 @@ impl <'a> HitRecord<'a> {
         ray.direction.0.dot(&outward_normal.0) < 0.0
     }
 }
-
 
 pub struct HittableList {
     pub hittables: Vec<Object>,

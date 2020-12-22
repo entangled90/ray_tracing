@@ -11,6 +11,8 @@ pub struct Camera {
     v: Point,
     w: Point,
     lens_radius: f32,
+    time_start: f32,
+    time_end: f32,
 }
 
 impl Camera {
@@ -22,6 +24,8 @@ impl Camera {
         aspect_ratio: f32,
         aperture: f32,
         focus_dist: f32,
+        time_start: f32,
+        time_end: f32,
     ) -> Camera {
         let theta = degrees_to_radians(vertical_fov);
         let h = (theta / 2.0).tan();
@@ -51,6 +55,8 @@ impl Camera {
             v: Point(v),
             w: Point(w),
             lens_radius: aperture / 2.0,
+            time_start,
+            time_end,
         }
     }
 
@@ -65,6 +71,7 @@ impl Camera {
                     - &self.origin.0)
                     - &offset,
             ),
+            r.random_double_in(self.time_start, self.time_end),
         )
     }
 }

@@ -224,6 +224,13 @@ impl Neg for &Vec3 {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Point(pub Vec3);
 
+impl Deref for Point {
+    type Target = Vec3;
+    fn deref(&self) -> &Vec3 {
+        &self.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

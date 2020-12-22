@@ -6,17 +6,17 @@ use std::error::Error;
 use std::result::Result;
 
 use crate::ray_tracing::camera::*;
+use crate::ray_tracing::color::*;
 use crate::ray_tracing::geom::*;
 use crate::ray_tracing::material::*;
 use crate::ray_tracing::object::*;
 use crate::ray_tracing::rand::*;
 use crate::ray_tracing::ray::*;
-use crate::ray_tracing::color::*;
 
 use rayon::prelude::*;
 
-const ASPECT_RATIO: f32 = 3.0 / 2.0;
-const IMAGE_WIDTH: f32 = 1200f32;
+const ASPECT_RATIO: f32 = 16.0 / 9.0;
+const IMAGE_WIDTH: f32 = 400f32;
 const IMAGE_HEIGTH: f32 = IMAGE_WIDTH / ASPECT_RATIO;
 
 fn init_camera() -> Camera {
@@ -33,6 +33,8 @@ fn init_camera() -> Camera {
         ASPECT_RATIO,
         aperture,
         focus_dist,
+        0.0,
+        1.0,
     )
 }
 
@@ -44,6 +46,7 @@ fn random_world() -> HittableList {
         center: Point(Vec3::new(0.0, -1000.0, 0.0)),
         radius: 1000.0,
         material: material_ground,
+        moving_component: None,
     });
 
     for a in -11..11 {
@@ -56,25 +59,38 @@ fn random_world() -> HittableList {
             ));
 
             if (&center.0 - &Vec3::new(4.0, 0.2, 0.0)).length() > 0.9 {
-                let material: Material = match choose_mat {
+                let (material, moving_component) = match choose_mat {
                     //diffuse
                     m if m < 0.8 => {
                         let albedo =
                             Vec3::random(&mut random).index_wise_mul(&Vec3::random(&mut random));
-                        Material::new_lambertian(Color::new(albedo))
+                        let center_1 = Point(
+                            &center.0 + &Vec3::new(0.0, random.random_double_in(0.0, 0.2), 0.0),
+                        );
+                        let moving_component = MovingComponent {
+                            center_0: center.clone(),
+                            center_1,
+                            time_0: 0.0,
+                            time_1: 1.0,
+                        };
+                        (
+                            Material::new_lambertian(Color::new(albedo)),
+                            Some(moving_component),
+                        )
                     }
                     // metal
                     m if m < 0.95 => {
                         let albedo = Vec3::random_in(&mut random, 0.5, 1.0);
                         let fuzz = random.random_double();
-                        Material::new_metal(Color::new(albedo), fuzz)
+                        (Material::new_metal(Color::new(albedo), fuzz), None)
                     }
-                    _ => Material::new_dielectric(1.5),
+                    _ => (Material::new_dielectric(1.5), None),
                 };
                 world.add(Object::Sphere {
                     center,
                     radius: 0.2,
                     material,
+                    moving_component,
                 });
             }
         }
@@ -84,16 +100,19 @@ fn random_world() -> HittableList {
         center: Point(Vec3::new(0.0, 1.0, 0.0)),
         radius: 1.0,
         material: Material::new_dielectric(1.5),
+        moving_component: None,
     });
     world.add(Object::Sphere {
         center: Point(Vec3::new(-4.0, 1.0, 0.0)),
         radius: 1.0,
         material: Material::new_lambertian(Color::new(Vec3::new(0.4, 0.2, 0.1))),
+        moving_component: None,
     });
     world.add(Object::Sphere {
         center: Point(Vec3::new(4.0, 1.0, 0.0)),
         radius: 1.0,
         material: Material::new_metal(Color::new(Vec3::new(0.7, 0.6, 0.5)), 0.0),
+        moving_component: None,
     });
 
     world
@@ -104,7 +123,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut out_handle = stdout.lock();
     let stderr = stderr();
     let mut err_handle = stderr.lock();
-    let samples_per_pixel = 500u32;
+    let samples_per_pixel = 100u32;
     let samples_per_pixel_f = samples_per_pixel as f32;
 
     let max_depth = 50;
@@ -124,16 +143,18 @@ fn main() -> Result<(), Box<dyn Error>> {
             // err_handle
             //     .write_fmt(format_args!("Scanlines remaining: {}\n", j))
             //     .unwrap();
-            (0..IMAGE_WIDTH as u32).map(|i| {
-                (0..samples_per_pixel)
-                    .map(|_| {
-                        let u = (i as f32 + (random.random_double())) * inverse_width;
-                        let v = (j as f32 + (random.random_double())) * inverse_height;
-                        let ray = camera.ray(u, v, &mut random);
-                        ray.color(&world, max_depth, &mut random)
-                    })
-                    .sum()
-            }).collect()
+            (0..IMAGE_WIDTH as u32)
+                .map(|i| {
+                    (0..samples_per_pixel)
+                        .map(|_| {
+                            let u = (i as f32 + (random.random_double())) * inverse_width;
+                            let v = (j as f32 + (random.random_double())) * inverse_height;
+                            let ray = camera.ray(u, v, &mut random);
+                            ray.color(&world, max_depth, &mut random)
+                        })
+                        .sum()
+                })
+                .collect()
         })
         .collect();
 
