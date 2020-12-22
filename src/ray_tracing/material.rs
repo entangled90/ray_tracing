@@ -2,6 +2,7 @@ use super::geom::*;
 use super::rand::*;
 use super::ray::*;
 use Material::*;
+use super::color::*;
 
 pub enum Material{
     Lambertian {

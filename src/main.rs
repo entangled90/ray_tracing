@@ -11,6 +11,8 @@ use crate::ray_tracing::material::*;
 use crate::ray_tracing::object::*;
 use crate::ray_tracing::rand::*;
 use crate::ray_tracing::ray::*;
+use crate::ray_tracing::color::*;
+
 use rayon::prelude::*;
 
 const ASPECT_RATIO: f32 = 3.0 / 2.0;
