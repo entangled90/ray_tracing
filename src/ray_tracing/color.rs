@@ -4,6 +4,7 @@ use std::ops::Add;
 
 use super::geom::*;
 
+#[derive(Clone, Debug)]
 pub struct Color {
     pub rgb: Vec3,
 }

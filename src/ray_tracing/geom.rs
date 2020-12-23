@@ -2,7 +2,7 @@ use super::rand::Random;
 
 use std::ops::*;
 
-pub const PI: f32 = 3.141_592_653_589_793;
+pub const PI: f32 = 3.141_592_653_589_7; //93;
 
 pub const INFINITY: f32 = f32::INFINITY;
 
@@ -63,6 +63,15 @@ impl Vec3 {
         Vec3::random_in_unit_sphere(r).unit_norm()
     }
     const NEAR_ZERO: f32 = 1e-8;
+
+    pub fn get(&self, i: usize) -> f32 {
+        match i {
+            0 => self.x,
+            1 => self.y,
+            2 => self.z,
+            _ => panic!(format!("Invalid index {}", i)),
+        }
+    }
 
     pub fn is_near_zero(&self) -> bool {
         Vec3::component_is_near_zero(self.x)

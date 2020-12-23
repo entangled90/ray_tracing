@@ -4,6 +4,7 @@ use super::rand::*;
 use super::ray::*;
 use Material::*;
 
+#[derive(Debug, Clone)]
 pub enum Material {
     Lambertian {
         albedo: Color,

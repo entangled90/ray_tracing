@@ -16,7 +16,7 @@ use crate::ray_tracing::ray::*;
 use rayon::prelude::*;
 
 const ASPECT_RATIO: f32 = 16.0 / 9.0;
-const IMAGE_WIDTH: f32 = 400f32;
+const IMAGE_WIDTH: f32 = 400.0;
 const IMAGE_HEIGTH: f32 = IMAGE_WIDTH / ASPECT_RATIO;
 
 fn init_camera() -> Camera {
@@ -38,11 +38,11 @@ fn init_camera() -> Camera {
     )
 }
 
-fn random_world() -> HittableList {
-    let mut world = HittableList::new();
+fn random_world() -> Object {
+    let mut world = Vec::new();
     let mut random = Random::default();
     let material_ground = Material::new_lambertian(Color::new_rgb(0.5, 0.5, 0.5));
-    world.add(Object::Sphere {
+    world.push(Object::Sphere {
         center: Point(Vec3::new(0.0, -1000.0, 0.0)),
         radius: 1000.0,
         material: material_ground,
@@ -86,7 +86,7 @@ fn random_world() -> HittableList {
                     }
                     _ => (Material::new_dielectric(1.5), None),
                 };
-                world.add(Object::Sphere {
+                world.push(Object::Sphere {
                     center,
                     radius: 0.2,
                     material,
@@ -96,33 +96,31 @@ fn random_world() -> HittableList {
         }
     }
 
-    world.add(Object::Sphere {
+    world.push(Object::Sphere {
         center: Point(Vec3::new(0.0, 1.0, 0.0)),
         radius: 1.0,
         material: Material::new_dielectric(1.5),
         moving_component: None,
     });
-    world.add(Object::Sphere {
+    world.push(Object::Sphere {
         center: Point(Vec3::new(-4.0, 1.0, 0.0)),
         radius: 1.0,
         material: Material::new_lambertian(Color::new(Vec3::new(0.4, 0.2, 0.1))),
         moving_component: None,
     });
-    world.add(Object::Sphere {
+    world.push(Object::Sphere {
         center: Point(Vec3::new(4.0, 1.0, 0.0)),
         radius: 1.0,
         material: Material::new_metal(Color::new(Vec3::new(0.7, 0.6, 0.5)), 0.0),
         moving_component: None,
     });
 
-    world
+    Object::new_bvh_node(&mut world, 0.0, 1.0)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let stdout = stdout();
     let mut out_handle = stdout.lock();
-    let stderr = stderr();
-    let mut err_handle = stderr.lock();
     let samples_per_pixel = 100u32;
     let samples_per_pixel_f = samples_per_pixel as f32;
 
@@ -140,9 +138,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .rev()
         .map(|j| {
             let mut random = Random::default();
-            // err_handle
-            //     .write_fmt(format_args!("Scanlines remaining: {}\n", j))
-            //     .unwrap();
+
             (0..IMAGE_WIDTH as u32)
                 .map(|i| {
                     (0..samples_per_pixel)
@@ -165,6 +161,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             color.write(&mut out_handle, scale)?
         }
     }
-    err_handle.write_all(b"Done!\n")?;
+    stderr().lock().write_all(b"Done!\n")?;
     Ok(())
 }

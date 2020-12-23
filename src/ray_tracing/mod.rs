@@ -1,3 +1,4 @@
+pub mod bounding_box;
 pub mod camera;
 pub mod color;
 pub mod geom;

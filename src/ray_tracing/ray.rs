@@ -25,7 +25,7 @@ impl<'a> Ray<'a> {
         Point(&self.origin.0 + &self.direction.0.scalar_mul(t))
     }
 
-    pub fn color(&self, world: &HittableList, depth: u32, r: &mut Random) -> Color {
+    pub fn color(&self, world: &Object, depth: u32, r: &mut Random) -> Color {
         if depth == 0 {
             Color::zero()
         } else if let Some(rec) = world.hit(&self, 0.001, INFINITY) {
@@ -84,33 +84,5 @@ impl<'a> HitRecord<'a> {
     // static
     fn is_front_face(outward_normal: &Point, ray: &Ray) -> bool {
         ray.direction.0.dot(&outward_normal.0) < 0.0
-    }
-}
-
-pub struct HittableList {
-    pub hittables: Vec<Object>,
-}
-
-impl HittableList {
-    pub fn new() -> HittableList {
-        HittableList {
-            hittables: Vec::with_capacity(64),
-        }
-    }
-    pub fn add(&mut self, hittable: Object) {
-        self.hittables.push(hittable);
-    }
-
-    pub fn hit(&self, ray: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
-        let mut temp_rec: Option<HitRecord> = None;
-        let mut closest_so_far = t_max;
-        for object in &self.hittables {
-            // note closest_so_far is used as t_max
-            if let Some(rec) = object.hit(ray, t_min, closest_so_far) {
-                closest_so_far = rec.t;
-                temp_rec = Some(rec);
-            }
-        }
-        temp_rec
     }
 }

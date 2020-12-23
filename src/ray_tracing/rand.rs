@@ -13,6 +13,9 @@ impl Random {
         self.0.gen()
     }
 
+    pub fn random_int_in(&mut self, min: usize, max: usize) -> usize {
+        self.random_double_in(min as f32, max as f32 + 1.0) as usize
+    }
     pub fn random_double_in(&mut self, min: f32, max: f32) -> f32 {
         min + (max - min) * self.random_double()
     }
